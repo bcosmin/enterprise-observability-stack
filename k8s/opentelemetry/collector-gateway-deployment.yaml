@@ -1,0 +1,57 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector-gateway
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector-gateway
+  template:
+    metadata:
+      labels:
+        app: otel-collector-gateway
+    spec:
+      containers:
+        - name: collector
+          image: otel/opentelemetry-collector-contrib:0.92.0
+          args: ["--config=/etc/otelcol/otel-collector-config.yaml"]
+          ports:
+            - containerPort: 4317
+            - containerPort: 4318
+            - containerPort: 8889
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/otelcol
+          resources:
+            requests:
+              cpu: 100m
+              memory: 200Mi
+            limits:
+              cpu: 200m
+              memory: 400Mi
+      volumes:
+        - name: config-volume
+          configMap:
+            name: otel-collector-gateway-conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector-gateway
+  namespace: observability
+spec:
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+    - name: metrics
+      port: 8889
+      targetPort: 8889
+  selector:
+    app: otel-collector-gateway

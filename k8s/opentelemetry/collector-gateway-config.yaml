@@ -1,57 +1,55 @@
 ---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: otel-collector-gateway
-  namespace: observability
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: otel-collector-gateway
-  template:
-    metadata:
-      labels:
-        app: otel-collector-gateway
-    spec:
-      containers:
-        - name: collector
-          image: otel/opentelemetry-collector-contrib:0.92.0
-          args: ["--config=/etc/otelcol/otel-collector-config.yaml"]
-          ports:
-            - containerPort: 4317
-            - containerPort: 4318
-            - containerPort: 8889
-          volumeMounts:
-            - name: config-volume
-              mountPath: /etc/otelcol
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-      volumes:
-        - name: config-volume
-          configMap:
-            name: otel-collector-gateway-conf
----
 apiVersion: v1
-kind: Service
+kind: ConfigMap
 metadata:
-  name: otel-collector-gateway
+  name: otel-collector-gateway-conf
   namespace: observability
-spec:
-  ports:
-    - name: otlp-grpc
-      port: 4317
-      targetPort: 4317
-    - name: otlp-http
-      port: 4318
-      targetPort: 4318
-    - name: metrics
-      port: 8889
-      targetPort: 8889
-  selector:
-    app: otel-collector-gateway
+data:
+  otel-collector-config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 80
+        spike_limit_percentage: 20
+      batch:
+        send_batch_size: 1024
+        timeout: 5s
+
+    exporters:
+      # Export metrics to Mimir / Prometheus compatible backend
+      prometheus:
+        endpoint: "0.0.0.0:8889"
+        namespace: "otel"
+
+      # Export traces to Grafana Tempo
+      otlp/tempo:
+        endpoint: "tempo.observability.svc.cluster.local:4317"
+        tls:
+          insecure: true
+
+      # Export logs to Grafana Loki
+      otlphttp/loki:
+        endpoint: "http://loki.observability.svc.cluster.local:3100/otlp"
+
+    service:
+      pipelines:
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [prometheus]
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp/tempo]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlphttp/loki]
