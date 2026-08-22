@@ -1,6 +1,6 @@
 # Enterprise Observability Stack
 
-A production-ready, vendor-agnostic Observability Stack built on cloud-native standards. This project demonstrates how to implement a unified observability pipeline using **OpenTelemetry**, **Loki** (logs), **Tempo** (traces), **Mimir/Prometheus** (metrics), and **Grafana** (visualization).
+A production-ready, vendor-agnostic Observability Stack built on cloud-native standards.
 
 ## Architecture Overview
 This stack follows the modern **LGTM** (Loki, Grafana, Tempo, Mimir/Prometheus) pattern, standardized by OpenTelemetry.
